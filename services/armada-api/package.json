@@ -1,0 +1,27 @@
+{
+  "name": "armada-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js -e js,yaml",
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.18.0",
+    "cors": "^2.8.5",
+    "execution-time": "^1.4.1",
+    "express": "^4.16.4",
+    "lodash": "^4.17.11",
+    "moment": "^2.27.0",
+    "mysql": "^2.16.0",
+    "uuid": "^8.3.0",
+    "os": "^0.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "1.18.4"
+  }
+}

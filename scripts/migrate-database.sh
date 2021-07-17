@@ -1,0 +1,1 @@
+docker exec -it $(docker-compose ps -q scripts) /bin/sh /srv/migrate-database.sh $1 $2 $3

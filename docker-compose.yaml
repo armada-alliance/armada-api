@@ -1,0 +1,41 @@
+version: "3"
+
+services:
+  armada-db:
+    build: ./services/armada-db
+    ports:
+      - 9097:3306
+    restart: always
+    volumes:
+      - ./services/armada-db/data:/var/lib/mysql:delegated
+      - ./services/armada-db/conf-files/my.cnf:/etc/alternatives/my.cnf
+    environment:
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_ROOT_PASSWORD: root
+
+  armada-api:
+    image: node:14
+    env_file:
+      - ./environment/armada-api.development.env
+    environment:
+      - PORT=3000
+    working_dir: /app
+    volumes:
+      - ./services/armada-api:/app
+    ports:
+      - 3000:3000
+    command: ./entrypoint.sh
+    depends_on:
+      - armada-db
+
+  scripts:
+    build: ./services/scripts
+    volumes:
+      - ./services/scripts/src:/srv
+      - ./environment:/environment
+
+  proxy:
+    build: ./services/proxy
+    ports:
+      - 80:80
+    restart: always
