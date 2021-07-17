@@ -1,9 +1,12 @@
 const express = require('express')
 const os = require('os')
+const cors = require('cors')
 const pkg = require('../package.json')
 const createContext = require('./context/createContext')
 const bodyParser = require('body-parser')
 const app = express()
+
+app.use(cors())
 
 app.post('/newsletter/submit', bodyParser.json(), async (req, res) => {
 
