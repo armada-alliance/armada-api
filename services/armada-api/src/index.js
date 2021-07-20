@@ -4,9 +4,12 @@ const cors = require('cors')
 const pkg = require('../package.json')
 const createContext = require('./context/createContext')
 const bodyParser = require('body-parser')
+const telegram = require('./telegram')
 const app = express()
 
 app.use(cors())
+
+app.use(telegram)
 
 app.post('/newsletter/submit', bodyParser.json(), async (req, res) => {
 
