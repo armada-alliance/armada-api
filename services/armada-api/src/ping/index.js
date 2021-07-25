@@ -90,7 +90,6 @@ app.get('/ping/pools', async (req, res) => {
                     }, {})
                 }
 
-
                 const [{ avgUptimePct }] = await ctx.db.query('SELECT AVG(uptimePct) as avgUptimePct FROM metrics WHERE poolId = ?', [
                     pool.id
                 ])
@@ -196,7 +195,7 @@ app.post(`/ping`, bodyParser.json(), async (req, res) => {
             pool.poolId
         ])
 
-        let timeData = parseTimeData(metric.data)
+        let timeData = parseTimeData(metric ? metric.data : null)
 
         timeData = applyUptimeToTimeData(timeData, new Date())
 
