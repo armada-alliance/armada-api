@@ -58,11 +58,13 @@ const getUptimePctForTimeData = (timeData, { firstMetric, isToday }) => {
     return ~~((timeData.reduce((a, b) => a + b, 0) / timeData.length) * 100)
 }
 
-app.get('/ping/metrics', async (req, res) => {
+app.get('/ping/pools', async (req, res) => {
 
     let ctx = await createContext()
 
     try {
+
+        const includeMetrics = req.query.includeMetrics === "true"
 
         const date = moment.utc().format('YYYY-MM-DD')
 
@@ -74,10 +76,16 @@ app.get('/ping/metrics', async (req, res) => {
         const poolsWithMetrics = await Promise.all(
             pools.map(async pool => {
 
-                const metrics = await ctx.db.query('SELECT uptimePct, date FROM metrics WHERE date >= ? AND poolId = ? ORDER BY date DESC', [
-                    startDate,
-                    pool.id
-                ])
+                let metrics = null
+
+                if (includeMetrics) {
+                    metrics = await ctx.db.query('SELECT uptimePct, date FROM metrics WHERE date >= ? AND poolId = ? ORDER BY date DESC', [
+                        startDate,
+                        pool.id
+                    ])
+                    metrics.map(metric => ([metric.date, metric.uptimePct]))
+                }
+
 
                 const [{ avgUptimePct }] = await ctx.db.query('SELECT AVG(uptimePct) as avgUptimePct FROM metrics WHERE poolId = ?', [
                     pool.id
@@ -105,13 +113,19 @@ app.get('/ping/metrics', async (req, res) => {
                     }
                 }
 
+                if (metrics) {
+                    props = {
+                        ...props,
+                        metrics
+                    }
+                }
+
                 return {
                     ...pool,
                     ...props,
                     timeData: metric ? metric.data : null,
                     firstMetric: metric ? !previousMetricCount : null,
-                    avgUptimePct,
-                    metrics: metrics.map(metric => ([metric.date, metric.uptimePct]))
+                    avgUptimePct
                 }
             })
         )
