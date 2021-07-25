@@ -83,7 +83,11 @@ app.get('/ping/pools', async (req, res) => {
                         startDate,
                         pool.id
                     ])
-                    metrics.map(metric => ([metric.date, metric.uptimePct]))
+                    metrics = metrics.reduce((result, metric) => {
+                        const date = moment.utc(metric.date).format('YYYY-MM-DD')
+                        result[date] = metric.uptimePct
+                        return result
+                    }, {})
                 }
 
 
