@@ -2,6 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const axios = require('axios')
 const FormData = require('form-data')
+const createContext = require('../context/createContext')
 const telegram = axios.create({
     baseURL: `https://api.telegram.org/bot${process.env.TELEGRAM_API_TOKEN}`
 })
@@ -12,9 +13,37 @@ const bot_username = 'armada_robot'
 
 app.post(`/telegram/${process.env.TELEGRAM_WEBHOOK_ID}`, bodyParser.json(), async (req, res) => {
 
+    let ctx = await createContext()
+
     try {
 
         const { message } = req.body
+
+        if (message.from && message.from.username) {
+
+            let [telegram_user] = await ctx.db.query('SELECT * FROM telegram_users WHERE remoteId = ? LIMIT 1', [
+                message.from.id
+            ])
+
+            if (!telegram_user) {
+                await ctx.db.query('INSERT INTO telegram_users SET ?', {
+                    remoteId: message.from.id,
+                    username: message.from.username,
+                    lastMessage: message.text,
+                    lastActiveAt: new Date(),
+                    createdAt: new Date()
+                })
+            } else {
+                await ctx.db.query('UPDATE telegram_users SET ? WHERE remoteId = ?', [
+                    {
+                        username: message.from.username,
+                        lastMessage: message.text,
+                        lastActiveAt: new Date()
+                    },
+                    message.from.id
+                ])
+            }
+        }
 
         if (message.text === `/stats@${bot_username}`) {
 
@@ -46,7 +75,9 @@ app.post(`/telegram/${process.env.TELEGRAM_WEBHOOK_ID}`, bodyParser.json(), asyn
 
     } finally {
         res.send('ok')
-
+        if (ctx) {
+            await ctx.destroy()
+        }
     }
 
 })
