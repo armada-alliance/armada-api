@@ -93,11 +93,21 @@ app.get('/ping/metrics', async (req, res) => {
                     pool.id
                 ])
 
+                let props = {}
+
+                if (metric) {
+                    props = {
+                        nodeVersion,
+                        remainingKesPeriods,
+                        slotHeight,
+                        updatedAt,
+                        pingCount
+                    }
+                }
+
                 return {
                     ...pool,
-                    nodeVersion,
-                    remainingKesPeriods,
-                    slotHeight,
+                    ...props,
                     timeData: metric ? metric.data : null,
                     firstMetric: metric ? !previousMetricCount : null,
                     avgUptimePct,
