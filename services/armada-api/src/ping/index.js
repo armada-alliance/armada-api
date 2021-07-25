@@ -95,6 +95,9 @@ app.get('/ping/metrics', async (req, res) => {
 
                 return {
                     ...pool,
+                    nodeVersion,
+                    remainingKesPeriods,
+                    slotHeight,
                     timeData: metric ? metric.data : null,
                     firstMetric: metric ? !previousMetricCount : null,
                     avgUptimePct,
