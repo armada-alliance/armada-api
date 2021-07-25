@@ -97,11 +97,11 @@ app.get('/ping/metrics', async (req, res) => {
 
                 if (metric) {
                     props = {
-                        nodeVersion,
-                        remainingKesPeriods,
-                        slotHeight,
-                        updatedAt,
-                        pingCount
+                        nodeVersion: metric.nodeVersion,
+                        remainingKesPeriods: metric.remainingKesPeriods,
+                        slotHeight: metric.slotHeight,
+                        updatedAt: metric.updatedAt,
+                        pingCount: metric.pingCount,
                     }
                 }
 
