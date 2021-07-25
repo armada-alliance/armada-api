@@ -17,7 +17,7 @@ module.exports = ({ host, user, password, database, port }) => {
 
   const query = (query, bindings) =>
     new Promise((resolve, reject) => {
-      console.log(mysql.format(query, bindings));
+      // console.log(mysql.format(query, bindings));
       connection.query(query, bindings, (err, result) => {
         if (err) return reject(err);
         resolve(result);
