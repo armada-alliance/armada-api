@@ -14,7 +14,7 @@ jobs:
         run: echo ::set-output name=tag::$(echo ${GITHUB_REF:10})
       - name: Build the Docker image
         working-directory: ./services/armada-api
-        run: docker build . --file Dockerfile_arm64v8 --platform linux/arm/v8 --tag sublayer/armada-api:${{ steps.vars.outputs.tag }}
+        run: docker build . --file Dockerfile_arm64v8 --platform linux/arm64/v8 --tag sublayer/armada-api:${{ steps.vars.outputs.tag }}
       - name: Login into Gitlab Docker Registry
         run: docker login -u sublayer -p ${{ secrets.DOCKER_PASSWORD }}
       - name: Push image to Gitlab Docker Registry
