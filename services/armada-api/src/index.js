@@ -6,7 +6,11 @@ const createContext = require('./context/createContext')
 const bodyParser = require('body-parser')
 const telegram = require('./telegram')
 const ping = require('./ping')
+const startInterval = require('./utils/startInterval')
+const handleInterval = require('./ping/handleInterval')
 const app = express()
+
+startInterval(handleInterval)
 
 app.use(cors())
 

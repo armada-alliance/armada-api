@@ -4,59 +4,10 @@ const createContext = require('../context/createContext')
 const assert = require('assert')
 const app = express()
 const moment = require('moment')
-const times = require('lodash/times')
-const constant = require('lodash/constant')
-
-const AMOUNT_TIME_DATA_SLOTS = 60 * 24
-
-const createTimeData = () => {
-    return times(AMOUNT_TIME_DATA_SLOTS, constant(0))
-}
-const parseTimeData = input => {
-    return input ? input.split('').map(i => ~~i) : createTimeData()
-}
-
-const stringifyTimeData = input => {
-    return input.join('')
-}
-
-const getCurrentSlotIndex = (date) => {
-    const today = moment.utc().startOf('day').valueOf()
-    const dateInMillis = moment.utc(date).valueOf()
-    const diff = dateInMillis - today
-    const slotIndex = ~~(diff / (60 * 1000))
-    return slotIndex
-}
-
-const applyUptimeToTimeData = (timeData, date) => {
-
-    const slotIndex = getCurrentSlotIndex(date)
-
-    console.log(date, slotIndex)
-    timeData = [
-        ...timeData
-    ]
-
-    timeData[slotIndex] = 1
-
-    return timeData
-}
-
-const getUptimePctForTimeData = (timeData, { firstMetric, isToday }) => {
-
-    if (isToday) {
-        const slotIndex = getCurrentSlotIndex(new Date())
-        timeData = timeData.slice(0, slotIndex + 1)
-    }
-
-    if (firstMetric) {
-        timeData = timeData.slice(timeData.indexOf(1), timeData.length)
-    }
-
-    // console.log('timeData', timeData.join(''))
-
-    return ~~((timeData.reduce((a, b) => a + b, 0) / timeData.length) * 100)
-}
+const { parseTimeData, stringifyTimeData } = require('../metrics/timeData')
+const applyUptimeToTimeData = require('../metrics/applyUptimeToTimeData')
+const getUptimePctForTimeData = require('../metrics/getUptimePctForTimeData')
+const getStatusForTimeData = require('../metrics/getStatusForTimeData')
 
 app.get('/ping/pools', async (req, res) => {
 
@@ -72,63 +23,101 @@ app.get('/ping/pools', async (req, res) => {
 
         const pools = await ctx.db.query('SELECT poolId as id, ticker FROM pools')
 
-
         const poolsWithMetrics = await Promise.all(
             pools.map(async pool => {
 
-                let metrics = null
-
-                if (includeMetrics) {
-                    metrics = await ctx.db.query('SELECT uptimePct, date FROM metrics WHERE date >= ? AND poolId = ? ORDER BY date DESC', [
-                        startDate,
-                        pool.id
-                    ])
-                    metrics = metrics.reduce((result, metric) => {
-                        const date = moment.utc(metric.date).format('YYYY-MM-DD')
-                        result[date] = metric.uptimePct
-                        return result
-                    }, {})
-                }
-
-                const [{ avgUptimePct }] = await ctx.db.query('SELECT AVG(uptimePct) as avgUptimePct FROM metrics WHERE poolId = ?', [
+                let services = await ctx.db.query("SELECT CONCAT(`nodeType`, IFNULL(`addr`, ''), IFNULL(`port`, '')) as serviceId, nodeType, addr, port, poolId FROM metrics WHERE poolId = ? GROUP BY serviceId", [
                     pool.id
                 ])
 
-                const [{ totalCount: previousMetricCount }] = await ctx.db.query('SELECT COUNT(id) as `totalCount` FROM metrics WHERE date < ? AND poolId = ? LIMIT 1', [
-                    date,
-                    pool.id
-                ])
+                services = await Promise.all(
+                    services.map(async service => {
 
-                let [metric] = await ctx.db.query('SELECT * FROM metrics WHERE date = ? AND poolId = ? LIMIT 1', [
-                    date,
-                    pool.id
-                ])
+                        const { nodeType, addr, port, poolId } = service
 
-                let props = {}
+                        let metrics = null
 
-                if (metric) {
-                    props = {
-                        nodeVersion: metric.nodeVersion,
-                        remainingKesPeriods: metric.remainingKesPeriods,
-                        slotHeight: metric.slotHeight,
-                        updatedAt: metric.updatedAt,
-                        pingCount: metric.pingCount,
-                    }
-                }
+                        if (includeMetrics) {
+                            metrics = await ctx.db.query('SELECT uptimePct, date FROM metrics WHERE date >= ? AND poolId = ? AND nodeType = ? ORDER BY date DESC', [
+                                startDate,
+                                poolId,
+                                nodeType
+                            ])
+                            metrics = metrics.reduce((result, metric) => {
+                                const date = moment.utc(metric.date).format('YYYY-MM-DD')
+                                result[date] = metric.uptimePct
+                                return result
+                            }, {})
+                        }
 
-                if (metrics) {
-                    props = {
-                        ...props,
-                        metrics
-                    }
-                }
+                        const [{ avgUptimePct }] = await ctx.db.query('SELECT AVG(uptimePct) as avgUptimePct FROM metrics WHERE poolId = ?', [
+                            pool.id
+                        ])
+
+                        const [{ totalCount: previousMetricCount }] = await ctx.db.query('SELECT COUNT(id) as `totalCount` FROM metrics WHERE date < ? AND poolId = ? AND nodeType = ? LIMIT 1', [
+                            date,
+                            poolId,
+                            nodeType
+                        ])
+
+                        let [metric] = await ctx.db.query('SELECT * FROM metrics WHERE date = ? AND poolId = ? AND nodeType = ? LIMIT 1', [
+                            date,
+                            poolId,
+                            nodeType
+                        ])
+
+                        let props = {}
+
+                        if (metric && nodeType === 'core') {
+
+                            props = {
+                                ...props,
+                                nodeVersion: metric.nodeVersion,
+                                remainingKesPeriods: metric.remainingKesPeriods,
+                                slotHeight: metric.slotHeight,
+                            }
+                        }
+
+                        if (metric && nodeType === 'relay') {
+
+                            props = {
+                                ...props,
+                                addr,
+                                port
+                            }
+                        }
+
+                        if (metric) {
+                            props = {
+                                ...props,
+                                timeData: metric.timeData,
+                                status: metric.status,
+                                downtimeInMinutes: metric.downtimeInMinutes,
+                                updatedAt: metric.updatedAt,
+                                pingCount: metric.pingCount,
+                            }
+                        }
+
+                        if (metrics) {
+                            props = {
+                                ...props,
+                                metrics
+                            }
+                        }
+
+                        return {
+                            nodeType,
+                            timeData: metric ? metric.data : null,
+                            firstMetric: metric ? !previousMetricCount : null,
+                            avgUptimePct,
+                            ...props,
+                        }
+                    })
+                )
 
                 return {
                     ...pool,
-                    ...props,
-                    timeData: metric ? metric.data : null,
-                    firstMetric: metric ? !previousMetricCount : null,
-                    avgUptimePct
+                    services
                 }
             })
         )
@@ -185,14 +174,16 @@ app.post(`/ping`, bodyParser.json(), async (req, res) => {
 
         const date = moment.utc().format('YYYY-MM-DD')
 
-        const [{ totalCount: previousMetricCount }] = await ctx.db.query('SELECT COUNT(id) as `totalCount` FROM metrics WHERE date < ? AND poolId = ? LIMIT 1', [
+        const [{ totalCount: previousMetricCount }] = await ctx.db.query('SELECT COUNT(id) as `totalCount` FROM metrics WHERE date < ? AND poolId = ? AND nodeType = ? LIMIT 1', [
             date,
-            pool.poolId
+            pool.poolId,
+            'core'
         ])
 
-        let [metric] = await ctx.db.query('SELECT * FROM metrics WHERE date = ? AND poolId = ? LIMIT 1', [
+        let [metric] = await ctx.db.query('SELECT * FROM metrics WHERE date = ? AND poolId = ? AND nodeType = ? LIMIT 1', [
             date,
-            pool.poolId
+            pool.poolId,
+            'core'
         ])
 
         let timeData = parseTimeData(metric ? metric.data : null)
@@ -205,6 +196,10 @@ app.post(`/ping`, bodyParser.json(), async (req, res) => {
 
             await ctx.db.query('INSERT INTO metrics SET ?', {
                 date,
+                nodeType: 'core',
+                type: 'inbound',
+                status: getStatusForTimeData(timeData, { firstMetric: !previousMetricCount, isToday: true }),
+                downtimeInMinutes: 0,
                 poolId: pool.poolId,
                 ticker: pool.ticker,
                 data: stringifyTimeData(timeData),
@@ -218,7 +213,7 @@ app.post(`/ping`, bodyParser.json(), async (req, res) => {
             })
         } else {
 
-            await ctx.db.query('UPDATE metrics SET ? WHERE date = ? AND poolId = ?', [
+            await ctx.db.query('UPDATE metrics SET ? WHERE date = ? AND poolId = ? AND nodeType = ?', [
                 {
                     ticker: pool.ticker,
                     data: stringifyTimeData(timeData),
@@ -230,7 +225,8 @@ app.post(`/ping`, bodyParser.json(), async (req, res) => {
                     updatedAt: new Date()
                 },
                 date,
-                pool.poolId
+                pool.poolId,
+                'core'
             ])
         }
 
