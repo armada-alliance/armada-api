@@ -1,0 +1,21 @@
+name: Build Armada API
+
+on:
+  release:
+    types:
+      - created
+jobs:
+  build-armada-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set tag as environment variable
+        id: vars
+        run: echo ::set-output name=tag::$(echo ${GITHUB_REF:10})
+      - name: Build the Docker image
+        working-directory: ./services/armada-api
+        run: docker build . --file Dockerfile --platform linux/arm/v8 --tag sublayer/armada-api:${{ steps.vars.outputs.tag }}
+      - name: Login into Gitlab Docker Registry
+        run: docker login -u sublayer -p ${{ secrets.DOCKER_PASSWORD }}
+      - name: Push image to Gitlab Docker Registry
+        run: docker push sublayer/armada-api:${{ steps.vars.outputs.tag }}
